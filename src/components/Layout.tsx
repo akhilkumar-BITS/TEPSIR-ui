@@ -23,6 +23,9 @@ export function Layout() {
         </div>
 
         <nav className="app-nav">
+          <NavLink to="/assistant" className="nav-link">
+            Assistant
+          </NavLink>
           <NavLink to="/search" className="nav-link">
             Search
           </NavLink>

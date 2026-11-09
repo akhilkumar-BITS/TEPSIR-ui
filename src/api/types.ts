@@ -56,6 +56,25 @@ export interface SearchResponse {
   elapsed_ms: number;
 }
 
+export interface Citation {
+  marker: number;
+  chunk_id: string;
+  document_id: string;
+  document_title: string;
+  page_number: number | null;
+  score: number;
+}
+
+export interface AnswerResponse {
+  query: string;
+  answer: string | null;
+  citations: Citation[];
+  results: SearchHit[];
+  model: string | null;
+  elapsed_ms: number;
+  warning: string | null;
+}
+
 export interface SearchHistoryItem {
   id: string;
   query: string;
@@ -63,3 +82,83 @@ export interface SearchHistoryItem {
   result_count: number;
   created_at: string;
 }
+
+export type MessageRole = "USER" | "ASSISTANT";
+
+export interface ToolCallRecord {
+  name: string;
+  arguments: Record<string, unknown>;
+  ok: boolean;
+  summary: string;
+}
+
+export interface ConversationMessage {
+  id: string;
+  role: MessageRole;
+  content: string;
+  tool_calls: ToolCallRecord[] | null;
+  citations: Citation[] | null;
+  model: string | null;
+  warning: string | null;
+  created_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationSummary extends Conversation {
+  message_count: number;
+}
+
+export interface ConversationDetail extends Conversation {
+  messages: ConversationMessage[];
+}
+
+export interface ConversationList {
+  items: ConversationSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface ToolCallEvent {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface ToolResultEvent {
+  id: string;
+  name: string;
+  ok: boolean;
+  summary: string;
+}
+
+export interface StartEvent {
+  conversation_id: string;
+  user_message_id: string;
+  title: string;
+  model: string;
+}
+
+export interface DoneEvent {
+  message_id: string | null;
+  elapsed_ms: number;
+  model: string;
+  warning: string | null;
+}
+
+export interface AnswerResetEvent {
+  reason: string;
+  attempt: number;
+}
+
+export interface StreamErrorEvent {
+  detail: string;
+  code: string;
+}
+

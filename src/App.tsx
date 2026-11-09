@@ -4,6 +4,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminDocumentsPage } from "./pages/AdminDocumentsPage";
+import { AssistantPage } from "./pages/AssistantPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { SearchPage } from "./pages/SearchPage";
@@ -23,6 +24,7 @@ export default function App() {
             }
           >
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/assistant" element={<AssistantPage />} />
             <Route
               path="/admin/documents"
               element={

@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { api } from "../api/client";
-import type { SearchHistoryItem, SearchResponse } from "../api/types";
+import type { AnswerResponse, SearchHistoryItem, SearchResponse } from "../api/types";
+
+type SearchMode = "passages" | "answer";
 
 function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
@@ -16,7 +20,8 @@ function relativeTime(iso: string): string {
 export function SearchPage() {
   const [query, setQuery] = useState("");
   const [topK, setTopK] = useState(5);
-  const [response, setResponse] = useState<SearchResponse | null>(null);
+  const [mode, setMode] = useState<SearchMode>("passages");
+  const [response, setResponse] = useState<SearchResponse | AnswerResponse | null>(null);
   const [history, setHistory] = useState<SearchHistoryItem[]>([]);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +40,7 @@ export function SearchPage() {
   }, [loadHistory]);
 
   const runSearch = useCallback(
-    async (text: string, k: number) => {
+    async (text: string, k: number, nextMode: SearchMode) => {
       const trimmed = text.trim();
       if (trimmed.length < 2) {
         setError("Enter at least two characters.");
@@ -44,7 +49,10 @@ export function SearchPage() {
       setSearching(true);
       setError(null);
       try {
-        const result = await api.search(trimmed, k);
+        const result =
+          nextMode === "answer"
+            ? await api.searchAnswer(trimmed, k)
+            : await api.search(trimmed, k);
         setResponse(result);
         void loadHistory();
       } catch (err) {
@@ -58,22 +66,26 @@ export function SearchPage() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    void runSearch(query, topK);
+    void runSearch(query, topK, mode);
   }
 
   function handleHistoryClick(item: SearchHistoryItem) {
     setQuery(item.query);
     setTopK(item.top_k);
-    void runSearch(item.query, item.top_k);
+    void runSearch(item.query, item.top_k, mode);
   }
+
+  const answerResponse: AnswerResponse | null =
+    response && "answer" in response ? response : null;
 
   return (
     <div className="page">
       <section className="page-intro">
         <h1>Search policy guidance</h1>
         <p className="muted">
-          Ask a question in plain language. Results are retrieved from indexed travel and
-          expense policy passages and ranked by semantic similarity.
+          Ask a question in plain language. Passages are retrieved from indexed travel and
+          expense policy documents and ranked by semantic similarity. In Answer mode the
+          assistant summarises those passages and cites them.
         </p>
       </section>
 
@@ -97,9 +109,34 @@ export function SearchPage() {
           ))}
         </select>
         <button type="submit" className="button button-primary" disabled={searching}>
-          {searching ? "Searching…" : "Search"}
+          {searching
+            ? mode === "answer"
+              ? "Generating…"
+              : "Searching…"
+            : mode === "answer"
+              ? "Ask"
+              : "Search"}
         </button>
       </form>
+
+      <div className="mode-toggle" role="group" aria-label="Search mode">
+        <button
+          type="button"
+          className={mode === "passages" ? "active" : ""}
+          aria-pressed={mode === "passages"}
+          onClick={() => setMode("passages")}
+        >
+          Passages
+        </button>
+        <button
+          type="button"
+          className={mode === "answer" ? "active" : ""}
+          aria-pressed={mode === "answer"}
+          onClick={() => setMode("answer")}
+        >
+          Answer
+        </button>
+      </div>
 
       {error && <p className="alert alert-error">{error}</p>}
 
@@ -112,6 +149,39 @@ export function SearchPage() {
                 Try “per diem for meals”, “flight class rules”, or “receipt requirements”.
               </p>
             </div>
+          )}
+
+          {answerResponse && (
+            <section className="answer-card">
+              <div className="answer-header">
+                <h2>Answer</h2>
+                {answerResponse.model && <span className="badge">{answerResponse.model}</span>}
+              </div>
+              {answerResponse.answer ? (
+                <div className="answer-text">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {answerResponse.answer}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <p className="muted">No answer generated.</p>
+              )}
+              {answerResponse.citations.length > 0 && (
+                <ul className="citation-list">
+                  {answerResponse.citations.map((citation) => (
+                    <li key={citation.chunk_id}>
+                      <a className="citation-chip" href={`#chunk-${citation.chunk_id}`}>
+                        [{citation.marker}] {citation.document_title}
+                        {citation.page_number !== null ? ` · page ${citation.page_number}` : ""}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {answerResponse.warning && (
+                <p className="alert alert-warning">{answerResponse.warning}</p>
+              )}
+            </section>
           )}
 
           {response && (
@@ -136,7 +206,7 @@ export function SearchPage() {
 
           <ol className="result-list">
             {response?.results.map((hit) => (
-              <li key={hit.chunk_id} className="result-card">
+              <li key={hit.chunk_id} id={`chunk-${hit.chunk_id}`} className="result-card">
                 <div className="result-meta">
                   <span className="result-title">{hit.document_title}</span>
                   {hit.page_number !== null && (
